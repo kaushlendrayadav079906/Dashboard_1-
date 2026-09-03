@@ -1,20 +1,19 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, DateTime, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import declarative_mixin
 
 @declarative_mixin
 class UUIDMixin:
     """
     Mixin to add a UUID primary key to a model.
-    Uses PostgreSQL's gen_random_uuid() for server-side generation.
+    Uses python uuid4 for client-side generation.
     """
     id = Column(
-        UUID(as_uuid=True), 
+        Uuid(as_uuid=True), 
         primary_key=True, 
-        default=uuid.uuid4, 
-        server_default=text("gen_random_uuid()")
+        default=uuid.uuid4
     )
 
 @declarative_mixin
@@ -26,13 +25,13 @@ class TimestampMixin:
     created_at = Column(
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc), 
-        server_default=text("now()"), 
+        server_default=text("CURRENT_TIMESTAMP"), 
         nullable=False
     )
     updated_at = Column(
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc), 
         onupdate=lambda: datetime.now(timezone.utc), 
-        server_default=text("now()"), 
+        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"), 
         nullable=False
     )

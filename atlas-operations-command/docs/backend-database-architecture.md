@@ -83,3 +83,48 @@ The core backend is built using **FastAPI** (Python), handling all business logi
   - **SAP/ERP:** Synchronization of data and external operational commands with enterprise systems.
   - **Gemini AI:** Handling AI queries, automated data extraction, generative reporting, or insights generation.
   - **File Parser:** Heavy document parsing operations running asynchronously.
+
+////
+
+ATLASOPS CMD
+│
+├── PHASE 1 — Backend Foundation
+│   ├── Unit 1
+│   ├── Unit 2
+│   ├── Unit 3
+│   └── ...
+│
+├── PHASE 2 — Database
+│   ├── Unit 1
+│   ├── Unit 2
+│   └── ...
+│
+├── PHASE 3 — Authentication & RBAC
+│
+├── PHASE 4 — Company & Factory
+│
+├── PHASE 5 — Dashboard APIs
+│
+├── PHASE 6 — Financial
+│
+├── PHASE 7 — Operations
+│
+├── PHASE 8 — SAP / Files
+│
+├── PHASE 9 — AI / Gemini
+│
+├── PHASE 10 — Background Jobs
+│
+├── PHASE 11 — Real-time
+│
+├── PHASE 12 — Reports
+│
+├── PHASE 13 — Security
+│
+├── PHASE 14 — Testing
+│
+├── PHASE 15 — Performance
+│
+├── PHASE 16 — Staging
+│
+└── PHASE 17 — Production

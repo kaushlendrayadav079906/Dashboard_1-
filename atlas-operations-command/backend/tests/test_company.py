@@ -23,7 +23,7 @@ def test_create_company():
     data = response.json()
     assert data["name"] == "AtlasOps Demo Company"
     assert "id" in data
-    return data["id"]
+    assert data["id"] is not None
 
 def test_get_company():
     # First create

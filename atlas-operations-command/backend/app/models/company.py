@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Integer, CheckConstraint
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.models.base import UUIDMixin, TimestampMixin
 
@@ -15,3 +16,4 @@ class Company(Base, UUIDMixin, TimestampMixin):
         CheckConstraint('fiscal_year_start_month BETWEEN 1 AND 12', name='ck_companies_fiscal_year_start_month'),
         CheckConstraint("status IN ('active', 'inactive')", name='ck_companies_status'),
     )
+    users = relationship("User", back_populates="company", cascade="all, delete-orphan")
