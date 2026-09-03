@@ -12,8 +12,11 @@ class User(Base, UUIDMixin, TimestampMixin):
     status = Column(String(50), nullable=False, default="active")
 
     company = relationship("Company", back_populates="users")
+    user_roles = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
+    credential = relationship("UserCredential", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
+
         UniqueConstraint('company_id', 'email', name='uq_users_company_email'),
         CheckConstraint("status IN ('active', 'inactive')", name='ck_users_status'),
     )

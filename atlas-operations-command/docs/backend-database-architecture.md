@@ -43,7 +43,7 @@
               │                    │                     │
               ▼                    ▼                     ▼
       ┌───────────────┐     ┌─────────────┐      ┌──────────────┐
-      │ PostgreSQL    │     │    Redis    │      │ S3 / Storage │
+      │      MySQL    │     │    Redis    │      │ S3 / Storage │
       │ Main Database │     │ Cache/Queue │      │ Files        │
       └───────────────┘     └──────┬──────┘      └──────────────┘
                                    │

@@ -17,3 +17,4 @@ class Company(Base, UUIDMixin, TimestampMixin):
         CheckConstraint("status IN ('active', 'inactive')", name='ck_companies_status'),
     )
     users = relationship("User", back_populates="company", cascade="all, delete-orphan")
+    roles = relationship("Role", back_populates="company", cascade="all, delete-orphan")

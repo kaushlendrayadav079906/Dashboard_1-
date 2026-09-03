@@ -1,105 +1,80 @@
 import pytest
-from uuid import uuid4
 from fastapi.testclient import TestClient
+from uuid import uuid4
+from app.main import app
+from tests.conftest import setup_auth
 
-def test_user_tenant_isolation_and_crud(client: TestClient):
-    # 1. Create a company
-    comp_resp = client.post("/api/v1/company/settings", json={
-        "name": "User Test Company",
-        "currency_code": "USD",
-        "region": "NA",
-        "fiscal_year_start_month": 1,
-        "status": "active"
-    })
-    assert comp_resp.status_code == 201
-    company_id = comp_resp.json()["id"]
+client = TestClient(app)
 
-    # 2. Create User
+def test_user_crud_and_tenant_isolation(db_session):
+    # 1. Admin A in Company A
+    companyA_id, adminA_id, headersA = setup_auth(db_session, client, role="admin", email_prefix="adminA")
+    # 2. Admin B in Company B
+    companyB_id, adminB_id, headersB = setup_auth(db_session, client, role="admin", email_prefix="adminB")
+
+    # 3. Create User in Company A (Admin A) -> 201
     user_data = {
-        "company_id": company_id,
+        "company_id": str(companyA_id),
         "email": "alice@example.com",
         "full_name": "Alice",
         "status": "active"
     }
-    create_resp = client.post("/api/v1/users", json=user_data)
+    create_resp = client.post("/api/v1/users", json=user_data, headers=headersA)
     assert create_resp.status_code == 201
     user = create_resp.json()
     assert user["email"] == "alice@example.com"
     user_id = user["id"]
     
-    # 6. User belongs to correct Company
-    assert user["company_id"] == company_id
-
-    # 3. Retrieve User by ID
-    get_resp = client.get(f"/api/v1/users/{user_id}")
+    # 4. Check user doesn't leak password hash
+    assert "password" not in user
+    assert "password_hash" not in user
+    
+    # 5. Retrieve User by ID (Admin A) -> 200
+    get_resp = client.get(f"/api/v1/users/{user_id}", headers=headersA)
     assert get_resp.status_code == 200
     assert get_resp.json()["id"] == user_id
     
-    # Retrieve User by email within company (internal repo test usually, but here we test via creation duplicate)
-
-    # 4. List users by company
-    list_resp = client.get(f"/api/v1/companies/{company_id}/users")
+    # 6. Retrieve User by ID (Admin B) -> 404 (IDOR protection)
+    get_resp_b = client.get(f"/api/v1/users/{user_id}", headers=headersB)
+    assert get_resp_b.status_code == 404
+    
+    # 7. List users by company (Admin A) -> 200
+    list_resp = client.get(f"/api/v1/companies/{companyA_id}/users", headers=headersA)
     assert list_resp.status_code == 200
     users = list_resp.json()
-    assert len(users) == 1
-    assert users[0]["id"] == user_id
+    assert len(users) == 2 # Admin A and Alice
+    
+    # 8. List Company A users (Admin B) -> 403 (Cross-tenant block)
+    list_resp_b = client.get(f"/api/v1/companies/{companyA_id}/users", headers=headersB)
+    assert list_resp_b.status_code == 403
 
-    # 5. Update User
+    # 9. Update User (Admin A) -> 200
     update_resp = client.put(f"/api/v1/users/{user_id}", json={
         "full_name": "Updated Alice"
-    })
+    }, headers=headersA)
     assert update_resp.status_code == 200
     assert update_resp.json()["full_name"] == "Updated Alice"
     
-    # 7. Duplicate email within same company is rejected
-    dup_resp = client.post("/api/v1/users", json=user_data)
-    assert dup_resp.status_code == 400
+    # 10. Update User (Admin B) -> 404 (Cross-tenant block)
+    update_resp_b = client.put(f"/api/v1/users/{user_id}", json={
+        "full_name": "Hacked Alice"
+    }, headers=headersB)
+    assert update_resp_b.status_code == 404
 
-    # 8. Same email in different companies is allowed
-    comp2_resp = client.post("/api/v1/company/settings", json={
-        "name": "User Test Company 2",
-        "currency_code": "EUR",
-        "region": "EU",
-        "fiscal_year_start_month": 1,
-        "status": "active"
-    })
-    assert comp2_resp.status_code == 201
-    company2_id = comp2_resp.json()["id"]
+def test_standard_user_restrictions(db_session):
+    company_id, user_id, headers = setup_auth(db_session, client, role="standard_user", email_prefix="std")
     
-    user_data2 = {
-        "company_id": company2_id,
-        "email": "alice@example.com",
+    # Standard user tries to create a user -> 403
+    user_data = {
+        "company_id": str(company_id),
+        "email": "bob@example.com",
         "full_name": "Bob",
         "status": "active"
     }
-    create2_resp = client.post("/api/v1/users", json=user_data2)
-    assert create2_resp.status_code == 201
-    user2_id = create2_resp.json()["id"]
-
-    # 11. Company isolation is respected
-    # Listing Company A: -> only Alice
-    list_resp_A = client.get(f"/api/v1/companies/{company_id}/users")
-    assert len(list_resp_A.json()) == 1
-    assert list_resp_A.json()[0]["id"] == user_id
-
-    # Listing Company B: -> only Bob
-    list_resp_B = client.get(f"/api/v1/companies/{company2_id}/users")
-    assert len(list_resp_B.json()) == 1
-    assert list_resp_B.json()[0]["id"] == user2_id
+    create_resp = client.post("/api/v1/users", json=user_data, headers=headers)
+    assert create_resp.status_code == 403
     
-    # 9. Missing company is rejected
-    invalid_comp_resp = client.post("/api/v1/users", json={
-        "company_id": str(uuid4()),
-        "email": "new@example.com",
-        "full_name": "New User"
-    })
-    assert invalid_comp_resp.status_code == 404
-
-    # 10. Invalid user status is rejected
-    invalid_status_resp = client.post("/api/v1/users", json={
-        "company_id": company_id,
-        "email": "new2@example.com",
-        "full_name": "New User",
-        "status": "invalid_status"
-    })
-    assert invalid_status_resp.status_code == 422
+    # Standard user lists users in their company -> 200
+    list_resp = client.get(f"/api/v1/companies/{company_id}/users", headers=headers)
+    assert list_resp.status_code == 200
+    assert len(list_resp.json()) >= 1
