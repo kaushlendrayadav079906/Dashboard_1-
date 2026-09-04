@@ -13,3 +13,7 @@ from app.models.vendor import Vendor
 from app.models.inventory_item import InventoryItem
 from app.models.financial_transaction import FinancialTransaction
 from app.models.kpi_snapshot import KpiSnapshot
+
+# Phase 4 models
+from app.models.upload import FileUpload
+from app.models.staging import StagedRecord
