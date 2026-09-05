@@ -6,11 +6,28 @@ from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.core.database import Base, get_db
 
+import os
+import subprocess
+
+def get_test_db_url():
+    db_host = os.environ.get("DB_HOST")
+    if not db_host:
+        try:
+            wsl_out = subprocess.check_output(["wsl", "-d", "Ubuntu", "hostname", "-I"], timeout=3).decode().split()
+            if wsl_out:
+                db_host = wsl_out[0]
+        except Exception:
+            db_host = "localhost"
+    if not db_host:
+        db_host = "localhost"
+    return f"mysql+pymysql://user:password@{db_host}:3307/atlasops_test"
+
 # Use MySQL for testing
-SQLALCHEMY_DATABASE_URL = "mysql+pymysql://user:password@localhost:3307/atlasops_test"
+SQLALCHEMY_DATABASE_URL = get_test_db_url()
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
