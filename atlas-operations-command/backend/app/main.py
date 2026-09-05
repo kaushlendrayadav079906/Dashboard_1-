@@ -12,6 +12,7 @@ from app.api.v1.factory import router as factory_router
 from app.api.v1.business import router as business_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.upload import router as upload_router
+from app.api.v1.ai import router as ai_router
 from app.core.exceptions import add_exception_handlers
 
 app = FastAPI(title="AtlasOps Cmd API")
@@ -23,6 +24,8 @@ app.include_router(factory_router, prefix="/api/v1")
 app.include_router(business_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
 app.include_router(upload_router, prefix="/api/v1")
+app.include_router(ai_router, prefix="/api/v1")
+app.include_router(ai_router, prefix="/api")
 add_exception_handlers(app)
 @app.get("/", include_in_schema=False)
 def root():

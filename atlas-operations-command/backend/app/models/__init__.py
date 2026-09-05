@@ -17,3 +17,6 @@ from app.models.kpi_snapshot import KpiSnapshot
 # Phase 4 models
 from app.models.upload import FileUpload
 from app.models.staging import StagedRecord
+
+# Phase 5B models
+from app.models.risk import Risk, AiRecommendedAction, ExecutiveBriefing
