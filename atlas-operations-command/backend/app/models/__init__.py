@@ -20,3 +20,7 @@ from app.models.staging import StagedRecord
 
 # Phase 5B models
 from app.models.risk import Risk, AiRecommendedAction, ExecutiveBriefing
+
+# Phase 7A models
+from app.models.exchange_rate import ExchangeRate
+

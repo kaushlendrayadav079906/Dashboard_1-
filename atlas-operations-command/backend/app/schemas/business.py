@@ -74,6 +74,15 @@ class FinancialTransactionBase(BaseModel):
     amount: Decimal
     currency_code: str = Field(..., max_length=3)
     description: Optional[str] = Field(None, max_length=255)
+    
+    # Phase 7A fields
+    amount_base: Optional[Decimal] = None
+    exchange_rate: Decimal = Field(Decimal("1.000000"), gt=0)
+    tax_rate: Decimal = Field(Decimal("0.00"), ge=0, le=100)
+    tax_amount: Decimal = Field(Decimal("0.00"), ge=0)
+    is_tax_inclusive: bool = False
+    hsn_sac_code: Optional[str] = Field(None, max_length=20)
+
     customer_id: Optional[UUID] = None
     vendor_id: Optional[UUID] = None
     product_id: Optional[UUID] = None
@@ -84,6 +93,7 @@ class FinancialTransactionResponse(FinancialTransactionBase):
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 # -----------------
 # Kpi Snapshot

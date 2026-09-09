@@ -2,12 +2,21 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.schemas.auth import LoginRequest, TokenResponse, AuthContext
+from app.schemas.auth import LoginRequest, TokenResponse, AuthContext, RegisterRequest, RegisterResponse
 from app.services.auth import AuthService
 from app.api.deps import get_current_user_context
 from app.api.rbac import RequireRole
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+def register(request: RegisterRequest, db: Session = Depends(get_db)):
+    """
+    Register a new company and its first administrator atomically.
+    The first user receives the company-scoped 'admin' role.
+    """
+    auth_service = AuthService(db)
+    return auth_service.register_company_and_admin(request)
 
 @router.post("/login", response_model=TokenResponse)
 def login(request: LoginRequest, db: Session = Depends(get_db)):
@@ -19,7 +28,7 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     # We allow UnauthenticatedException to bubble up 
     # as our global exception handler translates it to 401 correctly.
     access_token = auth_service.authenticate_user(
-        company_id=request.company_id,
+        company_name=request.company_name,
         email=request.email,
         password=request.password
     )

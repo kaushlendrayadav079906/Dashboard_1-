@@ -9,7 +9,7 @@ from app.models.user_role import UserRole
 from app.core.security import hash_password
 
 def setup_rbac_test_data(db_session):
-    company = Company(id=uuid4(), name="RBAC Test Company", currency_code="USD", region="NA", fiscal_year_start_month=1)
+    company = Company(id=uuid4(), name=f"RBAC Test Company {uuid4()}", currency_code="USD", region="NA", fiscal_year_start_month=1, status="active")
     db_session.add(company)
     db_session.commit()
     
@@ -54,9 +54,9 @@ def setup_rbac_test_data(db_session):
         "std_role": std_role
     }
 
-def login_and_get_token(client, company_id, email, password):
+def login_and_get_token(client, company_name, email, password):
     resp = client.post("/api/v1/auth/login", json={
-        "company_id": str(company_id),
+        "company_name": company_name,
         "email": email,
         "password": password
     })
@@ -66,12 +66,12 @@ def test_admin_authorization(client, db_session):
     data = setup_rbac_test_data(db_session)
     
     # Admin accesses admin route -> 200
-    token = login_and_get_token(client, data["company"].id, "admin@rbac.com", "adminpass")
+    token = login_and_get_token(client, data["company"].name, "admin@rbac.com", "adminpass")
     resp = client.get("/api/v1/auth/admin-test", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     
     # Standard user accesses admin route -> 403
-    token_std = login_and_get_token(client, data["company"].id, "std@rbac.com", "stdpass")
+    token_std = login_and_get_token(client, data["company"].name, "std@rbac.com", "stdpass")
     resp_forbidden = client.get("/api/v1/auth/admin-test", headers={"Authorization": f"Bearer {token_std}"})
     assert resp_forbidden.status_code == 403
     assert "Insufficient permissions" in resp_forbidden.json()["detail"]
@@ -80,13 +80,13 @@ def test_standard_user_authorization(client, db_session):
     data = setup_rbac_test_data(db_session)
     
     # Standard accesses standard route -> 200
-    token = login_and_get_token(client, data["company"].id, "std@rbac.com", "stdpass")
+    token = login_and_get_token(client, data["company"].name, "std@rbac.com", "stdpass")
     resp = client.get("/api/v1/auth/standard-test", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     
     # Admin accessing standard route fails because admin doesn't have standard_user role
     # unless we implicitly grant it, but requirements say we MUST explicitly check it.
-    token_admin = login_and_get_token(client, data["company"].id, "admin@rbac.com", "adminpass")
+    token_admin = login_and_get_token(client, data["company"].name, "admin@rbac.com", "adminpass")
     resp_forbidden = client.get("/api/v1/auth/standard-test", headers={"Authorization": f"Bearer {token_admin}"})
     assert resp_forbidden.status_code == 403
 
@@ -94,7 +94,7 @@ def test_multiple_roles(client, db_session):
     data = setup_rbac_test_data(db_session)
     
     # Dual user has both 'admin' and 'standard_user'
-    token = login_and_get_token(client, data["company"].id, "dual@rbac.com", "dualpass")
+    token = login_and_get_token(client, data["company"].name, "dual@rbac.com", "dualpass")
     
     resp1 = client.get("/api/v1/auth/admin-test", headers={"Authorization": f"Bearer {token}"})
     assert resp1.status_code == 200
@@ -111,7 +111,7 @@ def test_authentication_vs_authorization(client, db_session):
     assert resp1.json()["detail"] == "Not authenticated"
     
     # Valid token, invalid role -> 403
-    token = login_and_get_token(client, data["company"].id, "std@rbac.com", "stdpass")
+    token = login_and_get_token(client, data["company"].name, "std@rbac.com", "stdpass")
     resp2 = client.get("/api/v1/auth/admin-test", headers={"Authorization": f"Bearer {token}"})
     assert resp2.status_code == 403
 
@@ -134,7 +134,7 @@ def test_tenant_isolation(client, db_session):
     db_session.commit()
     
     # Login User B
-    token = login_and_get_token(client, company_b.id, "user@b.com", "bpass")
+    token = login_and_get_token(client, company_b.name, "user@b.com", "bpass")
     
     # Try to access admin-test
     resp = client.get("/api/v1/auth/admin-test", headers={"Authorization": f"Bearer {token}"})
@@ -145,7 +145,7 @@ def test_dynamic_role_change(client, db_session):
     data = setup_rbac_test_data(db_session)
     
     # Login standard user
-    token = login_and_get_token(client, data["company"].id, "std@rbac.com", "stdpass")
+    token = login_and_get_token(client, data["company"].name, "std@rbac.com", "stdpass")
     
     # Fails admin route
     assert client.get("/api/v1/auth/admin-test", headers={"Authorization": f"Bearer {token}"}).status_code == 403

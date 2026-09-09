@@ -14,6 +14,9 @@ class CompanyRepository:
     def get_by_id(self, db: Session, id: UUID) -> Company | None:
         return db.query(Company).filter(Company.id == id).first()
 
+    def get_active_by_name(self, db: Session, name: str) -> list[Company]:
+        return db.query(Company).filter(Company.name == name, Company.status == "active").all()
+
     def list(self, db: Session, skip: int = 0, limit: int = 100) -> list[Company]:
         return db.query(Company).offset(skip).limit(limit).all()
 

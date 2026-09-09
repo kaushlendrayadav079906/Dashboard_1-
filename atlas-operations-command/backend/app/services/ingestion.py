@@ -106,10 +106,12 @@ def _map_to_business_entities(db: Session, company_id: UUID, target_entity: str,
             if "amount" not in data or "transaction_date" not in data or "type" not in data:
                 raise IngestionError(f"Missing required fields for FinancialTransaction in row: {data}")
                 
-            # Requires parsing amounts securely
+            # Requires parsing amounts securely with Decimal
+            from decimal import Decimal, InvalidOperation
             try:
-                amount = float(data["amount"])
-            except ValueError:
+                raw_amt = str(data["amount"]).strip()
+                amount_decimal = Decimal(raw_amt)
+            except (InvalidOperation, TypeError, ValueError):
                 raise IngestionError(f"Invalid amount format: {data['amount']}")
                 
             from datetime import datetime
@@ -133,12 +135,33 @@ def _map_to_business_entities(db: Session, company_id: UUID, target_entity: str,
             else:
                 factory_uuid = None
                 
+            tx_currency = str(data.get("currency_code", "USD")).strip().upper()
+
+            # Phase 7B Currency conversion for base-currency amounts
+            from app.services.currency import CurrencyService
+            from app.core.exceptions import CurrencyRateNotFoundError
+            
+            currency_svc = CurrencyService(db)
+            try:
+                amount_base, exchange_rate = currency_svc.convert_to_company_base(
+                    company_id=company_id,
+                    amount=amount_decimal,
+                    transaction_currency=tx_currency,
+                    transaction_date=t_date
+                )
+            except CurrencyRateNotFoundError as e:
+                raise IngestionError(f"Currency conversion failed: {e.detail}")
+            except Exception as e:
+                raise IngestionError(f"Currency conversion error: {str(e)}")
+                
             obj = FinancialTransaction(
                 company_id=company_id,
                 factory_id=factory_uuid,
-                amount=amount,
+                amount=amount_decimal,
+                amount_base=amount_base,
+                exchange_rate=exchange_rate,
                 transaction_type=str(data["type"]),
-                currency_code=str(data.get("currency_code", "USD")),
+                currency_code=tx_currency,
                 description=str(data.get("description", "")),
                 transaction_date=t_date
             )

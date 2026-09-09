@@ -84,7 +84,7 @@ def setup_auth(db_session, client, role="admin", email_prefix="admin"):
     db_session.commit()
     
     resp = client.post("/api/v1/auth/login", json={
-        "company_id": str(company.id),
+        "company_name": company.name,
         "email": email,
         "password": "password"
     })

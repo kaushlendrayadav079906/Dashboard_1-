@@ -21,6 +21,40 @@ class InvalidAuthException(AuthException):
 class ForbiddenException(AuthException):
     pass
 
+class ConflictException(Exception):
+    def __init__(self, detail: str):
+        self.detail = detail
+
+class DuplicateExchangeRateError(ConflictException):
+    pass
+
+class CurrencyRateNotFoundError(Exception):
+    def __init__(self, detail: str):
+        self.detail = detail
+
+class TaxCalculationError(Exception):
+    def __init__(self, detail: str):
+        self.detail = detail
+
+class MissingTaxJurisdictionError(TaxCalculationError):
+    pass
+
+class InapplicableTaxJurisdictionError(TaxCalculationError):
+    pass
+
+class InvalidTaxRateError(TaxCalculationError):
+    pass
+
+class InvalidTaxJurisdictionError(TaxCalculationError):
+    pass
+class InvalidFiscalConfigurationError(Exception):
+    def __init__(self, detail: str):
+        self.detail = detail
+
+class InvalidLocalizationConfigurationError(Exception):
+    def __init__(self, detail: str):
+        self.detail = detail
+
 def add_exception_handlers(app: FastAPI):
     @app.exception_handler(UnauthenticatedException)
     async def unauthenticated_exception_handler(request: Request, exc: UnauthenticatedException):
@@ -48,6 +82,41 @@ def add_exception_handlers(app: FastAPI):
     async def not_found_exception_handler(request: Request, exc: NotFoundException):
         return JSONResponse(
             status_code=404,
+            content={"detail": exc.detail},
+        )
+
+    @app.exception_handler(ConflictException)
+    async def conflict_exception_handler(request: Request, exc: ConflictException):
+        return JSONResponse(
+            status_code=409,
+            content={"detail": exc.detail},
+        )
+
+    @app.exception_handler(CurrencyRateNotFoundError)
+    async def currency_rate_not_found_exception_handler(request: Request, exc: CurrencyRateNotFoundError):
+        return JSONResponse(
+            status_code=422,
+            content={"detail": exc.detail},
+        )
+
+    @app.exception_handler(TaxCalculationError)
+    async def tax_calculation_error_handler(request: Request, exc: TaxCalculationError):
+        return JSONResponse(
+            status_code=422,
+            content={"detail": exc.detail},
+        )
+
+    @app.exception_handler(InvalidFiscalConfigurationError)
+    async def invalid_fiscal_configuration_error_handler(request: Request, exc: InvalidFiscalConfigurationError):
+        return JSONResponse(
+            status_code=422,
+            content={"detail": exc.detail},
+        )
+
+    @app.exception_handler(InvalidLocalizationConfigurationError)
+    async def invalid_localization_configuration_error_handler(request: Request, exc: InvalidLocalizationConfigurationError):
+        return JSONResponse(
+            status_code=422,
             content={"detail": exc.detail},
         )
 
