@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, ReactNode, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
 
 export interface CartItem {
   id: string;
@@ -25,10 +24,8 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  const trackFunnel = useCallback(async (eventType: string, metadata: Record<string, unknown>) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("funnel_events").insert([{ user_id: user.id, event_type: eventType, metadata: metadata as any }]);
+  const trackFunnel = useCallback(async (_eventType: string, _metadata: Record<string, unknown>) => {
+    // Funnel tracking is now handled by the FastAPI backend and not by Supabase.
   }, []);
 
   const addToCart = (item: CartItem) => {

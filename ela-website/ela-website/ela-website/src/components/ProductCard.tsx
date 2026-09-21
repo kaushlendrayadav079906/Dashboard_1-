@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingCart, Zap } from "lucide-react";
-import { Product, formatPrice } from "@/data/products";
-import { getFirstItemCode } from "@/data/itemCodes";
+import { formatPrice, type Product } from "@/context/ProductContext";
 import { useCart } from "@/context/CartContext";
 import { toast } from "sonner";
 
@@ -18,7 +17,7 @@ const ProductCard = ({ product, index = 0 }: ProductCardProps) => {
   const navigate = useNavigate();
 
   const hasMultipleImages = product.images.length > 1;
-  const itemCode = getFirstItemCode(product.id);
+  const itemCode = product.item_code;
 
   // Existing pattern from SearchResultItem.tsx:1 & QuickViewModal.tsx:1
   // stock ?? quantity — data-driven, no hardcoding.
@@ -37,7 +36,7 @@ const ProductCard = ({ product, index = 0 }: ProductCardProps) => {
       price: product.price,
       size: defaultSize,
       quantity: 1,
-      image: product.images?.[0] ?? product.image,
+      image: product.images?.[0] || product.image || "",
       itemCode: itemCode ?? undefined,
     });
     toast.success("Added to cart", {
@@ -59,7 +58,7 @@ const ProductCard = ({ product, index = 0 }: ProductCardProps) => {
           price: product.price,
           size: defaultSize,
           quantity: 1,
-          image: product.images?.[0] ?? product.image,
+          image: product.images?.[0] || product.image || "",
           itemCode: itemCode ?? undefined,
         }
       }

@@ -5,8 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import koolLifeLogo from "@/assets/koollife-logo.jpg";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { products, formatPrice } from "@/data/products";
-import { supabase } from "@/integrations/supabase/client";
+import { formatPrice, useProducts } from "@/context/ProductContext";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -19,12 +18,12 @@ const Header = () => {
   const navigate = useNavigate();
   const { cartItems } = useCart();
   const { user, signOut } = useAuth();
+  const { products } = useProducts();
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!user) { setIsAdmin(false); return; }
-    supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle()
-      .then(({ data }) => setIsAdmin(!!data));
+    setIsAdmin(user.email === "admin@koollife.in");
   }, [user]);
 
   useEffect(() => {
@@ -55,7 +54,7 @@ const Header = () => {
       .filter((r) => r.matchCount > 0)
       .sort((a, b) => b.ratio - a.ratio || b.matchCount - a.matchCount)
       .map((r) => r.product);
-  }, [searchQuery]);
+  }, [products, searchQuery]);
 
   useEffect(() => {
     if (searchOpen) setTimeout(() => searchInputRef.current?.focus(), 100);

@@ -1,8 +1,8 @@
 ﻿import { useState, useEffect } from "react";
 import { X, Lock, CreditCard, Smartphone, Wallet, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Product, formatPrice } from "@/data/products";
-import { supabase } from "@/integrations/supabase/client";
+import { formatPrice, type Product } from "@/context/ProductContext";
+import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -54,10 +54,10 @@ const PaymentModal = ({ open, onClose, product }: PaymentModalProps) => {
     setProcessing(true);
     if (paymentType === "cod") { toast.info("Cash on Delivery requires shipping address. Proceed to checkout for COD orders."); setProcessing(false); return; }
     try {
-      const { data: rd, error: re } = await supabase.functions.invoke("create-razorpay-order", {
-        body: { amount: product.price, currency: "INR", receipt: `ela_q_${Date.now()}`, notes: { product_id: product.id, product_name: product.name } }
+      const rd = await apiFetch<{ order_id: string; amount: number; currency: string; key_id: string }>("/api/v1/payments/razorpay/order", {
+        method: "POST",
+        body: JSON.stringify({ amount: Math.round(product.price * 100), currency: "INR", receipt: `ela_q_${Date.now()}`, notes: { product_id: product.id, product_name: product.name } }),
       });
-      if (re || rd?.error) throw new Error(rd?.error || "Failed to create payment order");
       const options = {
         key: rd.key_id, amount: rd.amount, currency: rd.currency, name: "Ela by KOOL LIFESTYLE",
         description: product.name, order_id: rd.order_id, image: product.image, theme: { color: "#d63384" },
@@ -66,17 +66,18 @@ const PaymentModal = ({ open, onClose, product }: PaymentModalProps) => {
               : { upi: true, card: true, netbanking: true, wallet: true, emi: false },
         handler: async (resp: any) => {
           try {
-            const { data: vd, error: ve } = await supabase.functions.invoke("verify-razorpay-payment", {
-              body: { razorpay_order_id: resp.razorpay_order_id, razorpay_payment_id: resp.razorpay_payment_id, razorpay_signature: resp.razorpay_signature }
+            const vd = await apiFetch<{ verified: boolean; order_id?: string }>("/api/v1/payments/razorpay/verify", {
+              method: "POST",
+              body: JSON.stringify({
+                razorpay_order_id: resp.razorpay_order_id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature,
+                items: [{ id: product.id, name: product.name, quantity: 1, price: product.price, size: "standard" }],
+                shipping_address: { quick_checkout: true, razorpay_payment_id: resp.razorpay_payment_id, razorpay_order_id: resp.razorpay_order_id },
+              }),
             });
-            if (ve || !vd?.verified) { toast.error("Payment verification failed. Contact support."); setProcessing(false); return; }
-            const { data: order, error: oe } = await supabase.from("orders").insert([{
-              user_id: user.id, total_amount: product.price, status: "confirmed",
-              shipping_address: { quick_checkout: true, razorpay_payment_id: resp.razorpay_payment_id, razorpay_order_id: resp.razorpay_order_id } as any,
-            }]).select().single();
-            if (oe) throw oe;
-            await supabase.from("order_items").insert([{ order_id: order.id, product_id: product.id, product_name: product.name, quantity: 1, price: product.price }]);
-            toast.success("Payment successful! Order confirmed."); onClose(); navigate(`/order-confirmation/${order.id}`);
+            if (!vd?.verified) { toast.error("Payment verification failed. Contact support."); setProcessing(false); return; }
+            toast.success("Payment successful! Order confirmed."); onClose(); navigate(`/order-confirmation/${vd.order_id || "pending"}`);
           } catch (e) { console.error(e); toast.error("Payment received but order creation failed. Contact support."); }
           setProcessing(false);
         },

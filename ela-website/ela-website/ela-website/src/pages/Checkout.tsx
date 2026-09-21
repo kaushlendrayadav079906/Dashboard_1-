@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { formatPrice } from "@/data/products";
+import { formatPrice } from "@/context/ProductContext";
+import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 
 declare global {
@@ -74,55 +74,30 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      // Track checkout_started
-      await supabase.from("funnel_events").insert([{
-        user_id: user.id,
-        event_type: "checkout_started",
-        metadata: { item_count: checkoutItems.length, total } as any,
-      }]);
-
       if (paymentMethod === "cod") {
-        // COD Flow
-        const { data: codData, error: codError } = await supabase.functions.invoke(
-          "create-cod-order",
-          {
-            body: {
-              items: checkoutItems.map(item => ({ 
-                id: item.id, 
-                name: item.name,
-                quantity: item.quantity, 
-                price: item.price,
-                size: item.size,
-                itemCode: item.itemCode || null
-              })),
-              shipping_address: {
-                firstName: formData.firstName,
-                lastName: formData.lastName,
-                address: formData.address,
-                city: formData.city,
-                state: formData.state,
-                pincode: formData.pincode,
-                phone: formData.phone,
-                email: formData.email,
-              },
+        const codData = await apiFetch<{ order_id: string; total_amount: number; status: string; payment_method: string; message: string }>("/api/v1/orders/cod", {
+          method: "POST",
+          body: JSON.stringify({
+            items: checkoutItems.map((item) => ({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+              size: item.size,
+              item_code: item.itemCode || null,
+            })),
+            shipping_address: {
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              address: formData.address,
+              city: formData.city,
+              state: formData.state,
+              pincode: formData.pincode,
+              phone: formData.phone,
+              email: formData.email,
             },
-          }
-        );
-
-        if (codError || codData?.error) {
-          throw new Error(codData?.error || "Failed to create COD order");
-        }
-
-        await supabase.from("funnel_events").insert([{
-          user_id: user.id,
-          event_type: "order_placed",
-          metadata: {
-            order_id: codData.order_id,
-            total,
-            item_count: checkoutItems.length,
-            payment_method: "cod",
-          } as any,
-        }]);
+          }),
+        });
 
         if (!buyNowProduct) {
           clearCart();
@@ -134,26 +109,19 @@ const Checkout = () => {
         return;
       }
 
-      // Create Razorpay order via edge function
-      const { data: razorpayData, error: rzpError } = await supabase.functions.invoke(
-        "create-razorpay-order",
-        {
-          body: {
-            items: checkoutItems.map(item => ({ id: item.id, quantity: item.quantity })),
-            currency: "INR",
-            receipt: `ela_${Date.now()}`,
-            notes: {
-              customer_name: `${formData.firstName} ${formData.lastName}`,
-              email: formData.email,
-              phone: formData.phone,
-            },
+      const razorpayData = await apiFetch<{ order_id: string; amount: number; currency: string; key_id: string }>("/api/v1/payments/razorpay/order", {
+        method: "POST",
+        body: JSON.stringify({
+          amount: Math.round(total * 100),
+          currency: "INR",
+          receipt: `ela_${Date.now()}`,
+          notes: {
+            customer_name: `${formData.firstName} ${formData.lastName}`,
+            email: formData.email,
+            phone: formData.phone,
           },
-        }
-      );
-
-      if (rzpError || razorpayData?.error) {
-        throw new Error(razorpayData?.error || "Failed to create payment order");
-      }
+        }),
+      });
 
       // Open Razorpay checkout
       const options = {
@@ -198,52 +166,38 @@ const Checkout = () => {
         handler: async (response: any) => {
           try {
             // Verify payment
-            const { data: verifyData, error: verifyError } = await supabase.functions.invoke(
-              "verify-razorpay-payment",
-              {
-                body: {
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                  items: checkoutItems.map(item => ({
-                    id: item.id,
-                    name: item.name,
-                    quantity: item.quantity,
-                    price: item.price,
-                    size: item.size,
-                    itemCode: item.item_code || null,
-                  })),
-                  shipping_address: {
-                    firstName: formData.firstName,
-                    lastName: formData.lastName,
-                    address: formData.address,
-                    city: formData.city,
-                    state: formData.state,
-                    pincode: formData.pincode,
-                    phone: formData.phone,
-                    email: formData.email,
-                  },
+            const verifyData = await apiFetch<{ verified: boolean; order_id?: string; duplicate?: boolean }>("/api/v1/payments/razorpay/verify", {
+              method: "POST",
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                items: checkoutItems.map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  quantity: item.quantity,
+                  price: item.price,
+                  size: item.size,
+                  itemCode: item.itemCode || null,
+                })),
+                shipping_address: {
+                  firstName: formData.firstName,
+                  lastName: formData.lastName,
+                  address: formData.address,
+                  city: formData.city,
+                  state: formData.state,
+                  pincode: formData.pincode,
+                  phone: formData.phone,
+                  email: formData.email,
                 },
-              }
-            );
+              }),
+            });
 
-            if (verifyError || !verifyData?.verified) {
+            if (!verifyData?.verified) {
               toast.error("Payment verification failed. Please contact support.");
               setLoading(false);
               return;
             }
-
-            // Track order_placed
-            await supabase.from("funnel_events").insert([{
-              user_id: user.id,
-              event_type: "order_placed",
-              metadata: {
-                order_id: verifyData.order_id,
-                total,
-                item_count: checkoutItems.length,
-                payment_id: response.razorpay_payment_id,
-              } as any,
-            }]);
 
             if (!buyNowProduct) {
               clearCart();

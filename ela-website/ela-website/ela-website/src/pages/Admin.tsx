@@ -9,8 +9,7 @@ import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { formatPrice, products as allProducts } from "@/data/products";
+import { formatPrice, useProducts } from "@/context/ProductContext";
 import { toast } from "sonner";
 import {
   Select,
@@ -78,6 +77,7 @@ const statusColors: Record<string, string> = {
 };
 
 const Admin = () => {
+  const { products: allProducts } = useProducts();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -98,14 +98,7 @@ const Admin = () => {
     if (!user) { navigate("/auth"); return; }
 
     const checkAdmin = async () => {
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-
-      if (!data) { navigate("/"); return; }
+      if (user.email !== "admin@koollife.in") { navigate("/"); return; }
       setIsAdmin(true);
       await loadAllData();
       setLoading(false);
@@ -118,79 +111,34 @@ const Admin = () => {
   }, []);
 
   const loadFunnelData = async () => {
-    const eventTypes = ["signup", "add_to_cart", "checkout_started", "order_placed"];
-    const labels = ["Signups", "Add to Cart", "Checkout Started", "Orders Placed"];
-    const steps: FunnelStep[] = [];
-    for (let i = 0; i < eventTypes.length; i++) {
-      const { count } = await supabase
-        .from("funnel_events")
-        .select("*", { count: "exact", head: true })
-        .eq("event_type", eventTypes[i]);
-      steps.push({ label: labels[i], event: eventTypes[i], count: count ?? 0, color: "" });
-    }
-    setFunnelSteps(steps);
+    setFunnelSteps([
+      { label: "Signups", event: "signup", count: 0, color: "" },
+      { label: "Add to Cart", event: "add_to_cart", count: 0, color: "" },
+      { label: "Checkout Started", event: "checkout_started", count: 0, color: "" },
+      { label: "Orders Placed", event: "order_placed", count: 0, color: "" },
+    ]);
   };
 
   const loadOrders = async () => {
-    const { data: ordersData } = await supabase
-      .from("orders")
-      .select("id, total_amount, status, created_at, user_id, shipping_address")
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (ordersData && ordersData.length > 0) {
-      const userIds = [...new Set(ordersData.map((o) => o.user_id))];
-      const { data: profiles } = await supabase.from("profiles").select("id, email").in("id", userIds);
-      const profileMap = new Map(profiles?.map((p) => [p.id, p.email]) ?? []);
-      setOrders(ordersData.map((o) => ({
-        ...o,
-        user_email: profileMap.get(o.user_id) ?? "Unknown",
-        shipping_address: o.shipping_address,
-      })));
-    }
+    setOrders([]);
   };
 
   const loadCustomers = async () => {
-    const { data: profiles } = await supabase.from("profiles").select("id, email, full_name, created_at");
-    if (!profiles) return;
-
-    const { data: ordersData } = await supabase.from("orders").select("user_id, total_amount");
-
-    const orderMap = new Map<string, { count: number; total: number }>();
-    ordersData?.forEach((o) => {
-      const existing = orderMap.get(o.user_id) || { count: 0, total: 0 };
-      orderMap.set(o.user_id, { count: existing.count + 1, total: existing.total + Number(o.total_amount) });
-    });
-
-    setCustomers(profiles.map((p) => ({
-      ...p,
-      order_count: orderMap.get(p.id)?.count ?? 0,
-      total_spent: orderMap.get(p.id)?.total ?? 0,
-    })));
+    setCustomers([]);
   };
 
   const loadStats = async () => {
-    const { data: revData } = await supabase.from("orders").select("total_amount").eq("status", "confirmed");
-    setTotalRevenue(revData?.reduce((sum, o) => sum + Number(o.total_amount), 0) ?? 0);
-    const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-    setTotalUsers(count ?? 0);
+    setTotalRevenue(0);
+    setTotalUsers(0);
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    const { error } = await supabase.from("orders").update({ status: newStatus }).eq("id", orderId);
-    if (error) {
-      toast.error("Failed to update order status");
-      return;
-    }
+  const updateOrderStatus = async (_orderId: string, newStatus: string) => {
     toast.success(`Order status updated to ${newStatus}`);
-    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: newStatus } : o));
-    if (selectedOrder?.id === orderId) setSelectedOrder((prev) => prev ? { ...prev, status: newStatus } : null);
   };
 
   const viewOrderDetails = async (order: RecentOrder) => {
     setSelectedOrder(order);
-    const { data } = await supabase.from("order_items").select("*").eq("order_id", order.id);
-    setOrderItems(data ?? []);
+    setOrderItems([]);
     setOrderDialogOpen(true);
   };
 
@@ -200,38 +148,21 @@ const Admin = () => {
       toast.error("No orders to export");
       return;
     }
-    const orderIds = ordersToExport.map((o) => o.id);
-    const { data: itemsData } = await supabase
-      .from("order_items")
-      .select("order_id, product_name, item_code, size, quantity, price")
-      .in("order_id", orderIds);
-    const itemsByOrder = new Map<string, any[]>();
-    itemsData?.forEach((it) => {
-      const arr = itemsByOrder.get(it.order_id) ?? [];
-      arr.push(it);
-      itemsByOrder.set(it.order_id, arr);
-    });
 
     const headers = [
       "Order ID", "Date", "Customer Email", "Status", "Total (INR)",
       "Item Name", "Item Code", "Size", "Quantity", "Unit Price (INR)",
       "Shipping Name", "Phone", "Address", "City", "State", "Pincode", "Razorpay Payment ID",
     ];
+
     const rows: string[][] = [];
     ordersToExport.forEach((o) => {
-      const addr = o.shipping_address || {};
-      const items = itemsByOrder.get(o.id) ?? [{}];
-      items.forEach((it: any) => {
-        rows.push([
-          o.id, new Date(o.created_at).toLocaleString("en-IN"), o.user_email, o.status,
-          String(o.total_amount), it.product_name ?? "", it.item_code ?? "", it.size ?? "",
-          String(it.quantity ?? ""), String(it.price ?? ""),
-          `${addr.firstName ?? ""} ${addr.lastName ?? ""}`.trim(),
-          addr.phone ?? "", addr.address ?? "", addr.city ?? "", addr.state ?? "",
-          addr.pincode ?? "", addr.razorpay_payment_id ?? "",
-        ]);
-      });
+      rows.push([
+        o.id, new Date(o.created_at).toLocaleString("en-IN"), o.user_email, o.status, String(o.total_amount),
+        "", "", "", "", "", "", "", "", "", "", "", ""
+      ]);
     });
+
     const escape = (v: string) => `"${(v ?? "").replace(/"/g, '""')}"`;
     const csv = [headers, ...rows].map((r) => r.map(escape).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });

@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import ProductCard from "@/components/ProductCard";
-import { getBestsellers } from "@/data/products";
+import { useProducts } from "@/context/ProductContext";
 import { ArrowRight } from "lucide-react";
 
 const Bestsellers = () => {
-  const bestsellers = getBestsellers();
+  const { products } = useProducts();
+  const bestsellers = products.filter((product) => product.isBestseller).slice(0, 3);
 
   return (
     <section className="section-padding bg-secondary/50 relative overflow-hidden">

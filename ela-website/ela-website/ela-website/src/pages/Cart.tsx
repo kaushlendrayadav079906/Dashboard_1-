@@ -6,7 +6,7 @@ import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/context/CartContext";
-import { formatPrice } from "@/data/products";
+import { formatPrice } from "@/context/ProductContext";
 import { toast } from "sonner";
 
 const Cart = () => {

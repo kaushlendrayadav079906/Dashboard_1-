@@ -6,8 +6,8 @@ import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { formatPrice } from "@/data/products";
+import { formatPrice } from "@/context/ProductContext";
+import { apiFetch } from "@/lib/api";
 import { generateReceiptPDF } from "@/lib/receipt";
 import { toast } from "sonner";
 
@@ -58,31 +58,17 @@ const TrackOrder = () => {
 
     // Accept full UUID or 8-char prefix
     const clean = value.trim().replace(/^#/, "").toLowerCase();
-    let query = supabase
-      .from("orders")
-      .select("id, total_amount, status, payment_status, payment_method, created_at, updated_at, shipping_address");
 
-    if (clean.length === 36) {
-      query = query.eq("id", clean);
-    } else {
-      query = query.ilike("id", `${clean}%`);
-    }
-
-    const { data } = await query.limit(1).maybeSingle();
-
-    if (!data) {
+    try {
+      const data = await apiFetch<Order>(`/api/v1/orders/${clean}`);
+      setOrder(data as Order);
+      const oi = await apiFetch<OrderItem[]>(`/api/v1/orders/${data.id}/items`);
+      setItems(oi ?? []);
+    } catch {
       setNotFound(true);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setOrder(data as Order);
-    const { data: oi } = await supabase
-      .from("order_items")
-      .select("id, product_name, quantity, price, size, item_code")
-      .eq("order_id", data.id);
-    setItems(oi ?? []);
-    setLoading(false);
   };
 
   useEffect(() => {

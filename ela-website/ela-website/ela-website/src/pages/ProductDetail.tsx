@@ -5,14 +5,14 @@ import { ChevronLeft, ChevronRight as ChevronRightIcon, Minus, Plus, Heart, Truc
 import Layout from "@/components/layout/Layout";
 import ProductCard from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
-import { getProductById, products, formatPrice } from "@/data/products";
-import { getItemCode } from "@/data/itemCodes";
+import { formatPrice, useProducts } from "@/context/ProductContext";
 import { useCart } from "@/context/CartContext";
 import { toast } from "sonner";
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const product = getProductById(id || "");
+  const { products } = useProducts();
+  const product = products.find((item) => item.id === (id || ""));
   const { addToCart } = useCart();
 
   const [selectedSize, setSelectedSize] = useState<string>("");
@@ -37,10 +37,7 @@ const ProductDetail = () => {
 
   const activeColor = selectedColor || (product?.colors[0] ?? "");
 
-  const currentItemCode = useMemo(() => {
-    if (!product || !selectedSize) return undefined;
-    return getItemCode(product.id, activeColor, selectedSize);
-  }, [product, activeColor, selectedSize]);
+  const currentItemCode = product?.item_code || undefined;
 
   if (!product) {
     return (

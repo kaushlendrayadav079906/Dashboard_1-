@@ -5,8 +5,8 @@ import { Check, Package, Truck, Mail, ArrowRight, Download, MapPin } from "lucid
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { formatPrice } from "@/data/products";
+import { formatPrice } from "@/context/ProductContext";
+import { apiFetch } from "@/lib/api";
 import { generateReceiptPDF } from "@/lib/receipt";
 
 interface Order {
@@ -42,18 +42,15 @@ const OrderConfirmation = () => {
     if (!orderId) { navigate("/"); return; }
 
     (async () => {
-      const { data: o } = await supabase
-        .from("orders")
-        .select("id, total_amount, status, created_at, shipping_address, payment_method, payment_status")
-        .eq("id", orderId)
-        .maybeSingle();
-      if (!o) { navigate("/"); return; }
-      setOrder(o as Order);
-      const { data: oi } = await supabase
-        .from("order_items")
-        .select("id, product_name, quantity, price, size, item_code")
-        .eq("order_id", orderId);
-      setItems(oi ?? []);
+      try {
+        const o = await apiFetch<Order>(`/api/v1/orders/${orderId}`);
+        setOrder(o as Order);
+        const oi = await apiFetch<OrderItem[]>(`/api/v1/orders/${orderId}/items`);
+        setItems(oi ?? []);
+      } catch {
+        navigate("/");
+        return;
+      }
       setLoading(false);
     })();
   }, [orderId, user, authLoading, navigate]);

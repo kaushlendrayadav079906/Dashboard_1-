@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import Layout from "@/components/layout/Layout";
 import ProductCard from "@/components/ProductCard";
-import { products } from "@/data/products";
+import { useProducts } from "@/context/ProductContext";
 import { Button } from "@/components/ui/button";
 import { SlidersHorizontal, X, Sparkles, Gift, Truck } from "lucide-react";
 
@@ -24,6 +24,7 @@ const priceRanges = [
 ];
 
 const Shop = () => {
+  const { products } = useProducts();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);

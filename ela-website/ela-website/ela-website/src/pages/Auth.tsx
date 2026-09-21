@@ -1,8 +1,6 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +21,7 @@ const Auth = () => {
   const [resetSent, setResetSent] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signIn, signUp, resetPassword } = useAuth();
 
   if (user) {
     return <Navigate to="/" replace />;
@@ -35,28 +33,20 @@ const Auth = () => {
 
     try {
       if (mode === "forgot") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
-        });
-        if (error) throw error;
+        await resetPassword(email);
         setResetSent(true);
-        toast({ title: "Reset link sent!", description: "Check your email for the password reset link." });
+        toast({ title: "Reset request received", description: "Password reset is handled by the FastAPI backend; contact support if needed." });
       } else if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        await signIn(email, password);
         toast({ title: "Welcome back!", description: "You've signed in successfully." });
         navigate("/");
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
+        await signUp(email, password);
         toast({
           title: "Account created!",
-          description: "Please check your email to verify your account.",
+          description: "Your account is ready to use with the FastAPI backend.",
         });
+        navigate("/");
       }
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -68,10 +58,7 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      const { error } = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-      });
-      if (error) throw error;
+      toast({ title: "Google sign-in unavailable", description: "The app uses FastAPI credentials instead of Supabase OAuth.", variant: "destructive" });
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Google sign-in failed", variant: "destructive" });
     } finally {
