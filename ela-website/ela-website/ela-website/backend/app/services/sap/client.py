@@ -31,6 +31,7 @@ class SAPClient:
         return bool(self.session_id) and time.time() < self.session_expires_at
 
     def login(self) -> str:
+        
         if not self.base_url:
             raise SAPServiceError("SAP_SERVICE_LAYER_URL is not configured")
         if not self.company_db or not self.username or not self.password:
