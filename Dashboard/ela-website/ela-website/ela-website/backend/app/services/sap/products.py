@@ -106,18 +106,20 @@ class SAPProductMapper:
 
         # --- Sizes / colours ------------------------------------------------------
         sizes: List[str] = []
-        if raw.get("U_Size"):
+        u_size_raw = raw.get("U_Size") or raw.get("U_SIZE") or raw.get("U_size") or raw.get("U_Sizes")
+        if u_size_raw:
             seen: set = set()
-            for s in str(raw["U_Size"]).split(","):
+            for s in str(u_size_raw).split(","):
                 s = s.strip()
                 if s and s not in seen:
                     sizes.append(s)
                     seen.add(s)
 
         colors: List[str] = []
-        if raw.get("U_Colour"):
+        u_colour_raw = raw.get("U_Colour") or raw.get("U_Color") or raw.get("U_COLOUR") or raw.get("U_COLOR")
+        if u_colour_raw:
             seen_c: set = set()
-            for c in str(raw["U_Colour"]).split(","):
+            for c in str(u_colour_raw).split(","):
                 c = c.strip()
                 if c and c not in seen_c:
                     colors.append(c)

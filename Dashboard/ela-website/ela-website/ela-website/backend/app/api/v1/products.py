@@ -34,6 +34,37 @@ def list_products():
         raise HTTPException(status_code=500, detail=f"Unable to fetch products: {str(exc)}") from exc
 
 
+@router.get("/{item_code}")
+def get_product(item_code: str):
+    if not settings.SAP_DEFAULT_WAREHOUSE:
+        raise HTTPException(status_code=503, detail="SAP_DEFAULT_WAREHOUSE is not configured")
+    if not settings.SAP_DEFAULT_PRICE_LIST:
+        raise HTTPException(status_code=503, detail="SAP_DEFAULT_PRICE_LIST is not configured")
+
+    client = get_sap_client()
+    try:
+        raw_item = client.get_item_by_code(item_code.strip())
+        if not raw_item:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        warehouse_code = client.resolve_warehouse_code(settings.SAP_DEFAULT_WAREHOUSE)
+        group_map = client.get_item_groups()
+        mapped = SAPProductMapper.map_product(
+            raw_item,
+            price_list=settings.SAP_DEFAULT_PRICE_LIST,
+            warehouse_code=warehouse_code,
+            client=client,
+            group_map=group_map,
+        )
+        return mapped
+    except HTTPException:
+        raise
+    except SAPServiceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=f"Unable to fetch product: {str(exc)}") from exc
+
+
 @router.get("/{item_code}/image")
 def get_product_image(item_code: str):
     """Serve SAP product image through the ELA FastAPI proxy."""
